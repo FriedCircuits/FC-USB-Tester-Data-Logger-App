@@ -13,6 +13,8 @@ RXTXcomm  - http://rxtx.qbang.org/wiki/index.php/Main_Page
 The source is in the src folder which was developed with Netbeans.
 http://netbeans.org/
 
+TODO: Change layout of GUI to landscape.
+
 
 License: All source code and designs are released under 
 
