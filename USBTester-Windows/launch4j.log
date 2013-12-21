@@ -1,0 +1,25 @@
+
+
+CmdLine:	D:\Projects\FriedCircuits\USBTester\USBTester.exe --l4j-debug
+WOW64:		yes
+64-bit search:	SOFTWARE\JavaSoft\Java Runtime Environment...
+32-bit search:	SOFTWARE\JavaSoft\Java Runtime Environment...
+Ignore:		SOFTWARE\JavaSoft\Java Runtime Environment\1.6
+Ignore:		SOFTWARE\JavaSoft\Java Runtime Environment\1.6.0_31
+Ignore:		SOFTWARE\JavaSoft\Java Runtime Environment\1.7
+Match:		SOFTWARE\JavaSoft\Java Runtime Environment\1.7.0_45
+64-bit search:	SOFTWARE\JavaSoft\Java Development Kit...
+32-bit search:	SOFTWARE\JavaSoft\Java Development Kit...
+Ignore:		SOFTWARE\JavaSoft\Java Development Kit\1.7
+Ignore:		SOFTWARE\JavaSoft\Java Development Kit\1.7.0_04
+Ignore:		SOFTWARE\JavaSoft\Java Development Kit\1.7.0_45
+Check launcher:	C:\Program Files (x86)\Java\jre7\bin\javaw.exe (OK)
+Add classpath:	lib\jcommon-1.0.17.jar
+Add classpath:	lib\jfreechart-1.0.14.jar
+Add classpath:	lib\RXTXcomm.jar
+Add classpath:	lib\gson-2.2.4.jar
+Add classpath:	lib\AbsoluteLayout.jar
+Launcher:	C:\Program Files (x86)\Java\jre7\bin\javaw.exe
+Launcher args:	-classpath "D:\Projects\FriedCircuits\USBTester\USBTester.exe;lib\jcommon-1.0.17.jar;lib\jfreechart-1.0.14.jar;lib\RXTXcomm.jar;lib\gson-2.2.4.jar;lib\AbsoluteLayout.jar" Main.Interface_Main
+Args length:	190/32768 chars
+Exit code:	0

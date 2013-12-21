@@ -26,6 +26,12 @@ If you have a v1 you need to load the JSON firmware
 https://github.com/FriedCircuits/FC-USB-Tester-OLED-Backpack
 
 
+The USBTester-Windows is a EXE wrapper made with Launch4j
+
+This should help with issues running on Windows since it will check for the version of Java and its location as well as load the libraries.
+
+
+
 License: All source code and designs are released under 
 
 Creative Commons NonCommercial-ShareAlike 
