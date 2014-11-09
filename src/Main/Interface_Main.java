@@ -1,7 +1,7 @@
-/*USB Tester OLED Data Logger
+/*USB Tester OLED Data Logger1
  * Created: 01/12/2013
  * By: William Garrido (MobileWill)
- * Modified: 12/15/2013
+ * Modified: 10/18/2014 - Version 1.0
  * This app is used in conjuction with the USB Tester OLED backpack.
  * The backpack sends the voltage and current used by a USB device
  * via a serial port. Once captured you have the opention to save the
@@ -12,6 +12,7 @@
  * License:
  * This program is open source and released by FriedCircuits. It can be freely used and modified
  * as long as the orginal author and website are given credit and kept within the source code.
+ * CC-SA-BY
  * This code uses libraries from 
  * JFreeChart -  http://www.jfree.org/jfreechart/
  * RXTXComm - http://rxtx.qbang.org/
@@ -78,19 +79,31 @@ import org.jfree.data.xy.XYDataset;
 //Json Parsing
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.data.RangeType;
 
+//Get current version from github
+import java.net.*;
+import java.io.*;
+import java.util.concurrent.TimeUnit;
+
 /**
  *
  * @author William Garrido - www.mobilewill.us
- * @version 2.0
+ * @version 1.0
  */
 public class Interface_Main extends javax.swing.JFrame {
-               
+    
+          
+        Double appVersion = 1.0;
+        String appTitle = "USB Tester Data Logger - FriedCircuits.us - v" + appVersion;
+        static Double FW_VERSION = 0.00;
+                 
+        //Varibles for serial port and serial port data
         static SerialPort serialPort = null;
 	static OutputStream outStream = null;
 	static InputStream inStream = null;
@@ -99,14 +112,25 @@ public class Interface_Main extends javax.swing.JFrame {
         
          /** The time series data. */
         private TimeSeries seriesCurrent;
+        private TimeSeries seriesCurrentMax;
+        private TimeSeries seriesCurrentMin;
         private TimeSeries seriesVolt;
+        private TimeSeries seriesVoltMax;
+        private TimeSeries seriesVoltMin;
         private TimeSeries seriesWatt;
         private TimeSeries seriesDm;
         private TimeSeries seriesDp;
       
         /** The last element of serialData array processed */
         private int lastSize= 0;
+        
+        //Last element of array saved to temp file
+        private int lastCSVPos = 0;
 
+        String logTmpFile = "data.csv";
+        
+        //Track number of samples received
+        static int recSamples = 0;
         
  /*Runs once a second triggered by a timer
   *Then checks if since the run if there new data to process
@@ -151,6 +175,10 @@ public class Interface_Main extends javax.swing.JFrame {
                     
                     Double current = usbtester.getA();
                     Double voltage = usbtester.getV();
+                    Double currentMax = usbtester.getAMax();
+                    Double currentMin = usbtester.getAMin();
+                    Double voltMax = usbtester.getVMax();
+                    Double voltMin = usbtester.getVMin();
                     
                     
                     //Double current = Double.parseDouble(splits[4]);
@@ -165,6 +193,8 @@ public class Interface_Main extends javax.swing.JFrame {
                                
                     if (cboxGraph.isSelected()){
                         seriesCurrent.addOrUpdate(timeMillis, current); //Is this causing data to be overwritten?
+                        seriesCurrentMax.addOrUpdate(timeMillis, currentMax);
+                        seriesCurrentMin.addOrUpdate(timeMillis, currentMin);
                     }
                     lblCurrentValue.setText(current.toString() + "mA");
                     lblAMaxValue.setText(usbtester.getAMax().toString());
@@ -172,6 +202,8 @@ public class Interface_Main extends javax.swing.JFrame {
                     
                     if (cboxGraph.isSelected()){
                         seriesVolt.addOrUpdate(timeMillis, voltage);
+                        seriesVoltMax.addOrUpdate(timeMillis, voltMax);
+                        seriesVoltMin.addOrUpdate(timeMillis, voltMin);
                     }
                     lblVoltsValue.setText(voltage.toString());
                     lblVMaxValue.setText(usbtester.getVMax().toString());
@@ -199,7 +231,7 @@ public class Interface_Main extends javax.swing.JFrame {
                                 + "," + wattage + "," + usbtester.getmah() + "," + usbtester.getmwh()
                                 + "," + usbtester.getDp() + "," + usbtester.getDm()
                                );
-                    
+                    recSamples++;
 
                 }
                 
@@ -211,10 +243,12 @@ public class Interface_Main extends javax.swing.JFrame {
             //final Millisecond now = new Millisecond();
             System.out.println("Now = " + timeMillis.toString());
             //System.out.println(csvData.toString());
-            
+            serialData.clear();
+            //serialData.trimToSize();
+            lastSize = 0;
+            logData();
+
        }
-     
-     
      
  };
 
@@ -291,8 +325,9 @@ public class Interface_Main extends javax.swing.JFrame {
     
  /*Runs in a new thread that handles incoming serial data
   *Processes new data and appends it to and ArrayList  
-  */   
- public static class SerialReader implements SerialPortEventListener 
+  */  
+//ORG  public static class SerialReader implements SerialPortEventListener  Before adding FW check
+ public class SerialReader implements SerialPortEventListener 
     {
         private InputStream in;
         private byte[] buffer;
@@ -323,13 +358,23 @@ public class Interface_Main extends javax.swing.JFrame {
                     System.out.print(2*len+38 + ":");
                     serialData.add(new String(buffer,0,len)); 
                     System.out.print(serialData.size()+":");
-                    lblSamplesValue.setText(String.valueOf(serialData.size()));
+                    lblSamplesValue.setText(Integer.toString(recSamples));
                     System.out.println((2*len+38)*serialData.size());
                 }
                 //Command Response
                 else {
                     String dataCheck = "{\"W\":" + txtThreshold.getText();
                     if (new String(buffer,0,len).contains(dataCheck)) {lblStatus.setText("Threshold Set!");}
+                    else if (new String(buffer,0,len).contains("{\"V\":")){FW_VERSION = Double.parseDouble((new String(buffer,0,len).substring(5,8))); 
+                            //Version check to notify user and update title bar. 
+                            Double newFWVer = checkVersion('F');
+                            if(newFWVer > FW_VERSION){
+                                //JOptionPane.showMessageDialog(this, "Update available! Visit: http://github.com/friedcircuits","Update", JOptionPane.INFORMATION_MESSAGE);
+                                //jlblVer.setVisible(false);
+                                jlblVer.setText(appTitle + " - New FW Version: " + newFWVer.toString());
+                                lblStatus.setText("FW:" + FW_VERSION + " - New FW: v" + newFWVer.toString());
+                            }
+                    }
                 }
                
                 
@@ -362,6 +407,8 @@ public class Interface_Main extends javax.swing.JFrame {
         final XYPlot plot = result.getXYPlot();
         XYItemRenderer xyir = plot.getRenderer();
         xyir.setSeriesPaint(0, Color.GREEN);
+        xyir.setSeriesPaint(1, Color.RED);
+        xyir.setSeriesPaint(2, Color.BLUE);
         
         plot.setBackgroundPaint(Color.BLACK);
         ValueAxis domainAxis = plot.getDomainAxis();
@@ -391,6 +438,8 @@ public class Interface_Main extends javax.swing.JFrame {
         final XYPlot plot = result.getXYPlot();
         XYItemRenderer xyir = plot.getRenderer();
         xyir.setSeriesPaint(0, Color.GREEN);
+        xyir.setSeriesPaint(1, Color.RED);
+        xyir.setSeriesPaint(2, Color.BLUE);
         
         plot.setBackgroundPaint(Color.BLACK);
         ValueAxis domainAxis = plot.getDomainAxis();
@@ -506,7 +555,16 @@ public class Interface_Main extends javax.swing.JFrame {
            
         }
         
-
+        //Version check to notify user and update title bar. 
+        Double newVer = checkVersion('A');
+        if(newVer > appVersion){
+            JOptionPane.showMessageDialog(this, "Update available! Visit: http://github.com/friedcircuits","Update", JOptionPane.INFORMATION_MESSAGE);
+            jlblVer.setVisible(false);
+            appTitle = appTitle + " - New Version: " + newVer.toString();
+            jlblVer.setText(appTitle);
+        }
+        else{jlblVer.setText(appTitle);}
+        
         
         cmbPort.removeAllItems();
         ArrayList portNames = listPorts();
@@ -517,8 +575,12 @@ public class Interface_Main extends javax.swing.JFrame {
 
         cmbBaud.setSelectedIndex(7);
                 
-        this.seriesCurrent = new TimeSeries("Time", Millisecond.class);
+        this.seriesCurrent = new TimeSeries("Time1", Millisecond.class);
+        this.seriesCurrentMax = new TimeSeries("Time", Millisecond.class);
+        this.seriesCurrentMin = new TimeSeries("Time", Millisecond.class);
         final TimeSeriesCollection dataset = new TimeSeriesCollection(this.seriesCurrent);
+        dataset.addSeries(seriesCurrentMax);
+        dataset.addSeries(seriesCurrentMin);
         JFreeChart chart = createChartCurrent(dataset);
         ChartPanel chartPanel = new ChartPanel(chart);
         //chartPanel.setPreferredSize(new Dimension(100, 260)); //size according to my window
@@ -527,7 +589,11 @@ public class Interface_Main extends javax.swing.JFrame {
         plCurrent.validate();
         
         this.seriesVolt = new TimeSeries("Time", Millisecond.class);
+        this.seriesVoltMax = new TimeSeries("Time", Millisecond.class);
+        this.seriesVoltMin = new TimeSeries("Time", Millisecond.class);
         final TimeSeriesCollection datasetVolt = new TimeSeriesCollection(this.seriesVolt);
+        datasetVolt.addSeries(seriesVoltMax);
+        datasetVolt.addSeries(seriesVoltMin);
         JFreeChart chartVolt = createChartVolt(datasetVolt);
         ChartPanel chartPanelVolt = new ChartPanel(chartVolt);
         //chartPanelVolt.setPreferredSize(new Dimension(400, 260)); //size according to my window
@@ -568,7 +634,22 @@ public class Interface_Main extends javax.swing.JFrame {
         
         System.out.println(cmbPort.getItemCount());
         
-
+        File f = new File(logTmpFile);
+        if(f.exists()){
+            int reply = JOptionPane.showConfirmDialog(this, "Data temp file exists, resume? (No deletes file)","Resume?", JOptionPane.YES_NO_OPTION);
+            if (reply == JOptionPane.NO_OPTION) {
+              try{
+                f.delete(); 
+              }catch(Exception e){
+                  JOptionPane.showMessageDialog(this, "Unable to delete");
+                  JOptionPane.showMessageDialog(this, e);
+              }
+            }
+        }
+        else {
+            JOptionPane.showMessageDialog(this, "New session","Session", JOptionPane.INFORMATION_MESSAGE);
+        }
+        System.out.println(f.getAbsolutePath());
         
     }
 
@@ -580,9 +661,9 @@ public class Interface_Main extends javax.swing.JFrame {
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
+        bindingGroup = new org.jdesktop.beansbinding.BindingGroup();
 
-        jSeparator1 = new javax.swing.JSeparator();
-        jLabel2 = new javax.swing.JLabel();
+        jlblVer = new javax.swing.JLabel();
         plControl = new javax.swing.JPanel();
         btnSave = new javax.swing.JButton();
         btnStart = new javax.swing.JButton();
@@ -641,12 +722,13 @@ public class Interface_Main extends javax.swing.JFrame {
         plmAh = new javax.swing.JPanel();
         plmWh = new javax.swing.JPanel();
 
-        jLabel2.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
-        jLabel2.setText("Samples:");
+        jlblVer.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setTitle("USB Tester Data Logger - FriedCircuits.us");
         setMinimumSize(new java.awt.Dimension(1000, 680));
+
+        org.jdesktop.beansbinding.Binding binding = org.jdesktop.beansbinding.Bindings.createAutoBinding(org.jdesktop.beansbinding.AutoBinding.UpdateStrategy.READ_WRITE, jlblVer, org.jdesktop.beansbinding.ELProperty.create("${text}"), this, org.jdesktop.beansbinding.BeanProperty.create("title"));
+        bindingGroup.addBinding(binding);
 
         plControl.setBorder(new javax.swing.border.LineBorder(new java.awt.Color(0, 0, 0), 2, true));
         plControl.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
@@ -737,9 +819,11 @@ public class Interface_Main extends javax.swing.JFrame {
 
         jPanel1.setLayout(new org.netbeans.lib.awtextra.AbsoluteLayout());
 
+        lblVMax.setForeground(new java.awt.Color(255, 0, 0));
         lblVMax.setText(" Max:");
         jPanel1.add(lblVMax, new org.netbeans.lib.awtextra.AbsoluteConstraints(4, 20, 30, -1));
 
+        lblVMin.setForeground(new java.awt.Color(0, 0, 255));
         lblVMin.setText("   Min:");
         jPanel1.add(lblVMin, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 40, 40, -1));
 
@@ -747,6 +831,7 @@ public class Interface_Main extends javax.swing.JFrame {
         jPanel1.add(lblVMinValue, new org.netbeans.lib.awtextra.AbsoluteConstraints(40, 40, -1, -1));
 
         lblVolts.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        lblVolts.setForeground(new java.awt.Color(0, 204, 51));
         lblVolts.setText("Volts:");
         jPanel1.add(lblVolts, new org.netbeans.lib.awtextra.AbsoluteConstraints(0, 0, -1, -1));
 
@@ -759,14 +844,17 @@ public class Interface_Main extends javax.swing.JFrame {
         plControl.add(jPanel1, new org.netbeans.lib.awtextra.AbsoluteConstraints(170, 20, 80, 60));
 
         lblCurrent.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        lblCurrent.setForeground(new java.awt.Color(0, 204, 51));
         lblCurrent.setText("Ampere:");
 
         lblCurrentValue.setText("0.0mA");
 
+        lblAmax.setForeground(new java.awt.Color(255, 0, 0));
         lblAmax.setText("Max:");
 
         lblAMaxValue.setText("0.0");
 
+        lblAMin.setForeground(new java.awt.Color(0, 0, 255));
         lblAMin.setText("Min:");
 
         lblAMinValue.setText("0.0");
@@ -811,6 +899,7 @@ public class Interface_Main extends javax.swing.JFrame {
         plControl.add(jPanel2, new org.netbeans.lib.awtextra.AbsoluteConstraints(30, 20, 120, 60));
 
         lblWatts.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        lblWatts.setForeground(new java.awt.Color(0, 204, 51));
         lblWatts.setText("Watts:");
 
         lblWattsValue.setText("0.0");
@@ -867,11 +956,13 @@ public class Interface_Main extends javax.swing.JFrame {
         plControl.add(jPanel3, new org.netbeans.lib.awtextra.AbsoluteConstraints(270, 20, 80, 60));
 
         lblDp.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        lblDp.setForeground(new java.awt.Color(0, 204, 51));
         lblDp.setText("D+:");
 
         lblDpValue.setText("0.0");
 
         lblDm.setFont(new java.awt.Font("Tahoma", 1, 11)); // NOI18N
+        lblDm.setForeground(new java.awt.Color(0, 204, 51));
         lblDm.setText("D-:");
 
         lblDmValue.setText("0.0");
@@ -1022,12 +1113,14 @@ public class Interface_Main extends javax.swing.JFrame {
                     .addComponent(plmWh, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
         );
 
+        bindingGroup.bind();
+
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
     //Displays dialog box with about the program and a clickable link to the site
     private void btnAboutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnAboutActionPerformed
-
+              
         // for copying style
         JLabel label = new JLabel();
         Font font = label.getFont();
@@ -1040,7 +1133,7 @@ public class Interface_Main extends javax.swing.JFrame {
         // html content
         JEditorPane ep = new JEditorPane("text/html", "<html><body style=\"" + style + "\">" //
             + "This application was designed by <A HREF=http://www.friedcircuits.us>FriedCircuits</A> for the USB Tester." //
-            + "</body></html>");
+            + "<br><br><center>App Version: " + appVersion +"<br>FW Version: " + FW_VERSION + "</center><br><br>*Connect once to get FW version.</body></html>");
 
         // handle link events
         ep.addHyperlinkListener(new HyperlinkListener()
@@ -1147,6 +1240,17 @@ public class Interface_Main extends javax.swing.JFrame {
                 sldScreen.setEnabled(true);
                 btnReset.setEnabled(true);
                 spnRefSpd.setEnabled(true);
+                
+                 //Get Version from device
+                try {
+                    String outData = "V:";
+                    Interface_Main.outStream.write(outData.getBytes());
+                    Interface_Main.outStream.write('\n');
+                    //this.outStream.flush();
+                }
+                catch (IOException e){
+                    lblStatus.setText("Error getting FW version - " + e.toString());
+                }
             }
             //else lblStatus.setText("Error: Serial could not connect.");
 
@@ -1177,8 +1281,9 @@ public class Interface_Main extends javax.swing.JFrame {
             File file = fc.getSelectedFile();
             System.out.println(file);
 
+            
             try{
-                BufferedWriter writer = null;
+                /*BufferedWriter writer = null;
                 writer = new BufferedWriter(new FileWriter(file + ".csv")); //add .txt?
                 writer.write("time, amp, max, min, volt, max, min, wattage, mah, mwh, dp, dm");
                 writer.newLine();
@@ -1188,6 +1293,11 @@ public class Interface_Main extends javax.swing.JFrame {
                     writer.newLine();
                 }
                 writer.close( );
+                */
+                File sFile = new File(logTmpFile);
+                
+                Files.copy(sFile.toPath(), file.toPath());
+                
                 JOptionPane.showMessageDialog(this, "Data exported successfully!",
                     "Success!", JOptionPane.INFORMATION_MESSAGE);
             }
@@ -1205,7 +1315,11 @@ public class Interface_Main extends javax.swing.JFrame {
 
     private void btnClearActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnClearActionPerformed
         seriesCurrent.clear(); 
+        seriesCurrentMax.clear();
+        seriesCurrentMin.clear();
         seriesVolt.clear();
+        seriesVoltMax.clear();
+        seriesVoltMin.clear();
         seriesWatt.clear();
         seriesDp.clear();
         seriesDm.clear();
@@ -1262,7 +1376,74 @@ public class Interface_Main extends javax.swing.JFrame {
       this.seriesDm.setMaximumItemAge(history);
     }//GEN-LAST:event_spnGphHstryStateChanged
 
+    private void logData(){
+        
+        File f = new File(logTmpFile);
+        boolean header = false;
+                
+        if(!f.exists()){
+            header = true;
+        }
+                
+        //int csvDataSize = csvData.size();
+                
+        try{
+                BufferedWriter writer = null;
+                writer = new BufferedWriter(new FileWriter(f.getAbsolutePath(), true)); 
+                if(header){
+                    writer.write("time, amp, max, min, volt, max, min, wattage, mah, mwh, dp, dm");
+                    writer.newLine();
+                }
+                
+                for (int i = lastCSVPos; i < csvData.size(); i++){
+                    writer.write(csvData.get(i).toString());
+                    writer.newLine();
+                }
+
+                writer.close( );
+                System.out.println("Data Logged");
+                csvData.clear();
+                //csvData.trimToSize();
+                //lastCSVPos = csvDataSize;
+                
+            }
+            catch(java.io.IOException e) {
+
+                JOptionPane.showMessageDialog(this, e);
+
+            }
+        
+        
+        
+        
+    }
     
+    //Check version.dat from github for current version
+    public double checkVersion(char app) {
+        try{
+            URL ghVer;
+            if(app == 'A'){
+                ghVer = new URL("https://raw.githubusercontent.com/FriedCircuits/FC-USB-Tester-Data-Logger-App/master/version.dat");
+            }
+            else{
+                ghVer = new URL("https://raw.githubusercontent.com/FriedCircuits/FC-USB-Tester-OLED-Backpack/master/version.dat");
+            }
+            URLConnection yc = ghVer.openConnection();
+            BufferedReader in = new BufferedReader(new InputStreamReader(
+                                    yc.getInputStream()));
+            String inputLine;
+            inputLine = in.readLine();
+            System.out.println(app+inputLine);
+            in.close();
+            return Double.parseDouble(inputLine);
+        }
+        catch (java.io.IOException e){
+             JOptionPane.showMessageDialog(this, e);
+        }
+        return 0;
+    }
+
+
    
     /**
      * @param args the command line arguments
@@ -1305,7 +1486,6 @@ public class Interface_Main extends javax.swing.JFrame {
     private javax.swing.JComboBox cmbBaud;
     private javax.swing.JComboBox cmbPort;
     private javax.swing.JLabel jLabel1;
-    private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
     private javax.swing.JLabel jLabel5;
@@ -1313,8 +1493,8 @@ public class Interface_Main extends javax.swing.JFrame {
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
-    private javax.swing.JSeparator jSeparator1;
     private javax.swing.JSeparator jSeparator2;
+    private javax.swing.JLabel jlblVer;
     private javax.swing.JLabel lblAMaxValue;
     private javax.swing.JLabel lblAMin;
     private javax.swing.JLabel lblAMinValue;
@@ -1353,6 +1533,7 @@ public class Interface_Main extends javax.swing.JFrame {
     private javax.swing.JSpinner spnGphHstry;
     private javax.swing.JSpinner spnRefSpd;
     private static javax.swing.JTextField txtThreshold;
+    private org.jdesktop.beansbinding.BindingGroup bindingGroup;
     // End of variables declaration//GEN-END:variables
 }
 
