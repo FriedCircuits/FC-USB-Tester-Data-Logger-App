@@ -1,15 +1,28 @@
 FC-USB-Tester-Data-Logger-App
 =============================
 11-05-2014 - v1.0
+
 -Start of changelog
+
 -Uses temp file instead of memory for better long term logging
+
 -Able to resume unsaved session
+
 -Remote control of USB Tester display
+
 -Option to stop updating graph for long term logging
+
 -Option to change graph refresh speed
+
+-Option to set how long(in minutes) to keep history in graph or 0 for all 
+
 -Display max and mins on voltage\current graphs
+
 -Check github for new version
+
 -Check firmware version and check github for new version
+
+-About dialog shows versions 
 
 
 
