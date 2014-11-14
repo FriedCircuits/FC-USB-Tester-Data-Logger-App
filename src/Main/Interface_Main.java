@@ -184,9 +184,17 @@ public class Interface_Main extends javax.swing.JFrame {
                     //Double current = Double.parseDouble(splits[4]);
                     //Double voltage = Double.parseDouble(splits[3]);
                     
-                    DecimalFormat twoDForm = new DecimalFormat("#.##");
-                    Double wattage = Double.valueOf(twoDForm.format((current/1000)*voltage));
-                    
+                    Locale myLocale = Locale.getDefault();
+		    NumberFormat f = NumberFormat.getInstance(myLocale);
+		    DecimalFormat twoDForm = new DecimalFormat("#.##");
+		    Double WattageFTemp= ((current / 1000) * voltage);
+		    try {
+		    twoDForm.parse(twoDForm.format(WattageFTemp));
+		    } catch (ParseException e) {
+		    e.printStackTrace();
+		    }
+
+		    Double wattage = Double.valueOf(WattageFTemp);
                     //System.out.println("Current:" + current);
                     //System.out.println("Voltage:" + voltage);
                     //System.out.println("Wattage:" + wattage);
