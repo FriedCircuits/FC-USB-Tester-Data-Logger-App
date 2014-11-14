@@ -154,7 +154,10 @@ public class Interface_Main extends javax.swing.JFrame {
                     //String elementData = serialData.get(i).toString();
                     //String splits[] = elementData.split(":");
                     Gson gson = new GsonBuilder().create();
-                    USBTester usbtester = gson.fromJson(serialData.get(i).toString(), USBTester.class);
+                    USBTester usbtester =new USBTester();
+		    try {
+		    usbtester = gson.fromJson(serialData.get(i).toString(),
+								USBTester.class);
                     
                     /*
                     System.out.println(usbtester);
@@ -185,15 +188,12 @@ public class Interface_Main extends javax.swing.JFrame {
                     //Double voltage = Double.parseDouble(splits[3]);
                     
                     Locale myLocale = Locale.getDefault();
-		    NumberFormat f = NumberFormat.getInstance(myLocale);
+		    NumberFormat.getInstance(myLocale);
 		    DecimalFormat twoDForm = new DecimalFormat("#.##");
 		    Double WattageFTemp= ((current / 1000) * voltage);
-		    try {
+		   
 		    twoDForm.parse(twoDForm.format(WattageFTemp));
-		    } catch (ParseException e) {
-		    e.printStackTrace();
-		    }
-
+		   
 		    Double wattage = Double.valueOf(WattageFTemp);
                     //System.out.println("Current:" + current);
                     //System.out.println("Voltage:" + voltage);
@@ -240,7 +240,9 @@ public class Interface_Main extends javax.swing.JFrame {
                                 + "," + usbtester.getDp() + "," + usbtester.getDm()
                                );
                     recSamples++;
-
+                    } catch (Exception e) {
+		    e.printStackTrace();
+		    }
                 }
                 
                 lastSize = serialDataSize;
