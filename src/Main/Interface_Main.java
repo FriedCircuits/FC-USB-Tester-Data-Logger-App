@@ -2,6 +2,8 @@
  * Created: 01/12/2013
  * By: William Garrido (MobileWill)
  * Modified: 10/18/2014 - Version 1.0
+ * Updated to new Java 8 and Internationalization bug - Code clean up
+ *  - 06/27/2015 - Version 1.1.
  * This app is used in conjuction with the USB Tester OLED backpack.
  * The backpack sends the voltage and current used by a USB device
  * via a serial port. Once captured you have the opention to save the
@@ -21,7 +23,7 @@
 
 
 package Main;
-
+import java.text.ParseException;
 import com.fc.usbtester.gson.USBTester;
 import javax.swing.JOptionPane;
 import gnu.io.*;
@@ -29,7 +31,6 @@ import gnu.io.SerialPort;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Desktop;
-//import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Image;
 import java.awt.event.ActionEvent;
@@ -59,25 +60,17 @@ import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import javax.swing.filechooser.FileFilter;
 import javax.swing.filechooser.FileNameExtensionFilter;
-
+//JFreeChart libraries
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.ChartPanel;
 import org.jfree.chart.JFreeChart;
 import org.jfree.chart.axis.ValueAxis;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.renderer.xy.XYItemRenderer;
-//import org.jfree.data.category.CategoryDataset;
-//import org.jfree.data.category.DefaultCategoryDataset;
-//import org.jfree.data.time.DynamicTimeSeriesCollection;
-//import org.jfree.data.time.Second;
 import org.jfree.data.time.Millisecond;
 import org.jfree.data.time.TimeSeries;
 import org.jfree.data.time.TimeSeriesCollection;
 import org.jfree.data.xy.XYDataset;
-//import sun.java2d.loops.ProcessPath.ProcessHandler;
-//import org.jfree.ui.ApplicationFrame;
-//import org.jfree.ui.RefineryUtilities;
-
 //Json Parsing
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -87,7 +80,6 @@ import java.util.Calendar;
 import java.util.Date;
 import org.jfree.chart.axis.NumberAxis;
 import org.jfree.data.RangeType;
-
 //Get current version from github
 import java.net.*;
 import java.io.*;
@@ -96,12 +88,12 @@ import java.util.concurrent.TimeUnit;
 /**
  *
  * @author William Garrido - www.mobilewill.us
- * @version 1.0
+ * @version 1.1
  */
 public class Interface_Main extends javax.swing.JFrame {
     
           
-        Double appVersion = 1.0;
+        Double appVersion = 1.1;
         String appTitle = "USB Tester Data Logger - FriedCircuits.us - v" + appVersion;
         static Double FW_VERSION = 0.00;
                  
@@ -156,10 +148,7 @@ public class Interface_Main extends javax.swing.JFrame {
                     //String elementData = serialData.get(i).toString();
                     //String splits[] = elementData.split(":");
                     Gson gson = new GsonBuilder().create();
-                    USBTester usbtester =new USBTester();
-		    try {
-		    usbtester = gson.fromJson(serialData.get(i).toString(),
-								USBTester.class);
+                    USBTester usbtester = gson.fromJson(serialData.get(i).toString(), USBTester.class);
                     
                     /*
                     System.out.println(usbtester);
@@ -185,18 +174,17 @@ public class Interface_Main extends javax.swing.JFrame {
                     Double voltMax = usbtester.getVMax();
                     Double voltMin = usbtester.getVMin();
                     
-                    
-                    //Double current = Double.parseDouble(splits[4]);
-                    //Double voltage = Double.parseDouble(splits[3]);
-                    
                     Locale myLocale = Locale.getDefault();
-		    NumberFormat.getInstance(myLocale);
-		    DecimalFormat twoDForm = new DecimalFormat("#.##");
-		    Double WattageFTemp= ((current / 1000) * voltage);
-		   
-		    twoDForm.parse(twoDForm.format(WattageFTemp));
-		   
-		    Double wattage = Double.valueOf(WattageFTemp);
+                    NumberFormat f = NumberFormat.getInstance(myLocale);
+                    DecimalFormat twoDForm = new DecimalFormat("#.##");
+                    Double WattageFTemp= ((current / 1000) * voltage);
+                    try {
+                        twoDForm.parse(twoDForm.format(WattageFTemp));
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
+                    Double wattage = Double.valueOf(WattageFTemp);
+                    
                     //System.out.println("Current:" + current);
                     //System.out.println("Voltage:" + voltage);
                     //System.out.println("Wattage:" + wattage);
@@ -242,24 +230,19 @@ public class Interface_Main extends javax.swing.JFrame {
                                 + "," + usbtester.getDp() + "," + usbtester.getDm()
                                );
                     recSamples++;
-                    } catch (Exception e) {
-		    e.printStackTrace();
-		    }
+
                 }
                 
                 lastSize = serialDataSize;
             }         
-            
+           
             //System.out.println("Tick");
-                
-            //final Millisecond now = new Millisecond();
             System.out.println("Now = " + timeMillis.toString());
             //System.out.println(csvData.toString());
             serialData.clear();
             //serialData.trimToSize();
             lastSize = 0;
             logData();
-
        }
      
  };
@@ -277,7 +260,6 @@ public class Interface_Main extends javax.swing.JFrame {
             portNames.add(portIdentifier.getName()); //+  " - " +  getPortTypeName(portIdentifier.getPortType())
             System.out.println(portNames);
         }   
-        
         return portNames;
     }
     
@@ -320,7 +302,7 @@ public class Interface_Main extends javax.swing.JFrame {
                 
                 inStream = serialPort.getInputStream();
                 outStream = serialPort.getOutputStream();
-                
+               
                 //(new Thread(new SerialReader(inStream))).start();
                 //(new Thread(new SerialWriter(out))).start();
                 
