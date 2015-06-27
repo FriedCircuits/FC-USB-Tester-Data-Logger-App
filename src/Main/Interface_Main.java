@@ -44,6 +44,8 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.util.Locale;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.imageio.ImageIO;
@@ -154,7 +156,10 @@ public class Interface_Main extends javax.swing.JFrame {
                     //String elementData = serialData.get(i).toString();
                     //String splits[] = elementData.split(":");
                     Gson gson = new GsonBuilder().create();
-                    USBTester usbtester = gson.fromJson(serialData.get(i).toString(), USBTester.class);
+                    USBTester usbtester =new USBTester();
+		    try {
+		    usbtester = gson.fromJson(serialData.get(i).toString(),
+								USBTester.class);
                     
                     /*
                     System.out.println(usbtester);
@@ -184,9 +189,14 @@ public class Interface_Main extends javax.swing.JFrame {
                     //Double current = Double.parseDouble(splits[4]);
                     //Double voltage = Double.parseDouble(splits[3]);
                     
-                    DecimalFormat twoDForm = new DecimalFormat("#.##");
-                    Double wattage = Double.valueOf(twoDForm.format((current/1000)*voltage));
-                    
+                    Locale myLocale = Locale.getDefault();
+		    NumberFormat.getInstance(myLocale);
+		    DecimalFormat twoDForm = new DecimalFormat("#.##");
+		    Double WattageFTemp= ((current / 1000) * voltage);
+		   
+		    twoDForm.parse(twoDForm.format(WattageFTemp));
+		   
+		    Double wattage = Double.valueOf(WattageFTemp);
                     //System.out.println("Current:" + current);
                     //System.out.println("Voltage:" + voltage);
                     //System.out.println("Wattage:" + wattage);
@@ -232,7 +242,9 @@ public class Interface_Main extends javax.swing.JFrame {
                                 + "," + usbtester.getDp() + "," + usbtester.getDm()
                                );
                     recSamples++;
-
+                    } catch (Exception e) {
+		    e.printStackTrace();
+		    }
                 }
                 
                 lastSize = serialDataSize;
